@@ -1,13 +1,14 @@
 <?php
+
 /**
  * HUserInfoForm used to collect username and email, when provider doesn't give it.
- * When user provides existing email, then model will ask for password and when it will be correct, 
+ * When user provides existing email, then model will ask for password and when it will be correct,
  * then user can link curren provider to the local account.
- * 
+ *
  * @uses CFormModel
  * @version 1.2.5
  * @copyright Copyright &copy; 2013 Sviatoslav Danylenko
- * @author Sviatoslav Danylenko <dev@udf.su> 
+ * @author Sviatoslav Danylenko <dev@udf.su>
  * @license MIT ({@link http://opensource.org/licenses/MIT})
  * @link https://github.com/SleepWalker/hoauth
  */
@@ -44,112 +45,136 @@ class HUserInfoForm extends CFormModel {
 	 */
 	public $emailAtt;
 
-	public function rules()
-	{
+	public function rules() {
 		return array(
-			array('username', 'required', 'on' =>'username, both'), //, username_pass, both, both_pass'),
-			array('email', 'required', 'on' =>'email, email_pass, both, both_pass, username_pass'),
-			array('email', 'email', 'allowEmpty' => true),
-			array('password', 'required', 'on' => 'email_pass, username_pass, both_pass'),
-			array('password', 'validatePassword', 'on' => 'email_pass, username_pass, both_pass'),
-			array('password', 'unsafe', 'on' => 'email, username, both'),
+			array(
+				'username',
+				'required',
+				'on' => 'username, both'
+			),
+			//, username_pass, both, both_pass'),
+			array(
+				'email',
+				'required',
+				'on' => 'email, email_pass, both, both_pass, username_pass'
+			),
+			array(
+				'email',
+				'email',
+				'allowEmpty' => true
+			),
+			array(
+				'password',
+				'required',
+				'on' => 'email_pass, username_pass, both_pass'
+			),
+			array(
+				'password',
+				'validatePassword',
+				'on' => 'email_pass, username_pass, both_pass'
+			),
+			array(
+				'password',
+				'unsafe',
+				'on' => 'email, username, both'
+			),
 		);
 	}
 
 	/**
 	 * Scenario is required for this model, and also we need info about model, that we will be validating
-	 * 
+	 *
 	 * @access public
 	 */
-	public function __construct($model, $emailAtt, $nameAtt = null, $scenario = 'both')
-	{
-		if(empty($emailAtt))
+	public function __construct($model, $emailAtt, $nameAtt = null, $scenario = 'both') {
+		if(empty($emailAtt)) {
 			throw new CException('$emailAtt can not be empty! Please specify email attribute name.');
+		}
 
 		$this->email = $model->$emailAtt;
 
-		if(empty($nameAtt))
+		if(empty($nameAtt)) {
 			$scenario = 'email';
-		else
+		} else {
 			$this->username = $model->$nameAtt;
-
-		// correcting scenarios, if some of fields is not empty
-		if ($this->scenario == 'both')
-		{
-			if(!empty($this->email))
-				$this->scenario = 'username';
-			if(!empty($this->username))
-				$this->scenario = 'email';
 		}
 
-		$this->nameAtt = $nameAtt;
+		// correcting scenarios, if some of fields is not empty
+		if($this->scenario == 'both') {
+			if(!empty($this->email)) {
+				$this->scenario = 'username';
+			}
+			if(!empty($this->username)) {
+				$this->scenario = 'email';
+			}
+		}
+
+		$this->nameAtt  = $nameAtt;
 		$this->emailAtt = $emailAtt;
-		$this->_model = $model;
+		$this->_model   = $model;
 
 		parent::__construct($scenario);
 	}
 
-	public function attributeLabels()
-	{
+	public function attributeLabels() {
 		return array(
-			'email'=>$this->_model->getAttributeLabel($this->emailAtt),
-			'username'=>$this->_model->getAttributeLabel($this->nameAtt),
-			'password'=>HOAuthAction::t('Password'),
-			);
+			'email'    => $this->_model->getAttributeLabel($this->emailAtt),
+			'username' => $this->_model->getAttributeLabel($this->nameAtt),
+			'password' => HOAuthAction::t('Password'),
+		);
 	}
 
 	/**
-	 * Validates password, when password is correct, then sets the 
-	 * {@link HUserInfoForm::model} variable to new User model	
-	 * 
+	 * Validates password, when password is correct, then sets the
+	 * {@link HUserInfoForm::model} variable to new User model
+	 *
 	 * @access public
 	 * @return void
 	 */
-	public function validatePassword($attribute,$params)
-	{
-		if(HOAuthAction::$useYiiUser)
-		{
-			$user = User::model()->notsafe()->findByAttributes(array('email'=>$this->email));
+	public function validatePassword($attribute, $params) {
+		if(HOAuthAction::$useYiiUser) {
+			$user  = User::model()->notsafe()->findByAttributes(array('email' => $this->email));
 			$valid = Yii::app()->getModule('user')->encrypting($this->password) === $user->password;
-		}else{
+		} else {
 			$user = $this->_model->findByEmail($this->email);
-			if(method_exists($this->_model, 'verifyPassword'))
+			if(method_exists($this->_model, 'verifyPassword')) {
 				$valid = $user->verifyPassword($this->$attribute);
-			elseif(method_exists($this->_model, 'validatePassword'))
+			} elseif(method_exists($this->_model, 'validatePassword')) {
 				$valid = $user->validatePassword($this->$attribute);
-			else
+			} else {
 				throw new CException('You need to implement verifyPassword($password) or validatePassword($password) method in order to let hoauth validate user password.');
+			}
 		}
 
-		if($valid)
-			// setting up the current model, to use it later in HOAuthAction
+		if($valid) // setting up the current model, to use it later in HOAuthAction
+		{
 			$this->_model = $user;
-		else
+		} else {
 			$this->addError('password', HOAuthAction::t('Sorry, but password is incorrect'));
+		}
 	}
 
 	/**
 	 * Switch to the password scenario, when we dealing with passwords
 	 */
-	public function afterConstruct()
-	{
+	public function afterConstruct() {
 		parent::afterConstruct();
-		if(isset($_POST) && !empty($_POST[__CLASS__]['password']))
+		if(isset($_POST) && !empty($_POST[__CLASS__]['password'])) {
 			$this->scenario .= '_pass';
+		}
 	}
 
 	/**
 	 * Validate shortcut for CForm class instance
 	 */
-	public function getIsFormValid()
-	{
-		if($this->form->submitted('submit'))
+	public function getIsFormValid() {
+		if($this->form->submitted('submit')) {
 			return $this->form->validate();
+		}
 
 		// account confiramtion scenario, when social network 
 		// returned email of existing local account
-		if(!$this->_model->isNewRecord)
-		{
+		if(!$this->_model->isNewRecord) {
 			$this->addError('email', $this->confirmStr('email'));
 			$this->scenario = 'email_pass';
 			return false;
@@ -158,129 +183,126 @@ class HUserInfoForm extends CFormModel {
 	}
 
 	/**
-	 * The main function of this class. Here we validating user input with 
-	 * provided {@link HUserInfoForm::model} class instance. We also trying 
-	 * to catch the case, when user enters email or username of existing account. 
+	 * The main function of this class. Here we validating user input with
+	 * provided {@link HUserInfoForm::model} class instance. We also trying
+	 * to catch the case, when user enters email or username of existing account.
 	 * In this case HUserInfoForm will be switched to `_pass` scenarios.
-	 * 
+	 *
 	 * @access public
 	 * @return boolean true if the user input is valid for both {@link HUserInfoForm::model} and HUserInfoForm models
 	 */
-	public function validateUser()
-	{
-		if(!$this->isFormValid)
+	public function validateUser() {
+		if(!$this->isFormValid) {
 			return false;
+		}
 
 		// beginning from valid models, without any errors
 		$this->clearErrors();
 		$this->_model->clearErrors();
 
-		$user = $this->_model;
+		$user     = $this->_model;
 		$emailAtt = $this->emailAtt;
-		$nameAtt = $this->nameAtt;
+		$nameAtt  = $this->nameAtt;
 
 		$validators = array();
 
 		// initilizing properties of user model
-		if($nameAtt)
-		{
+		if($nameAtt) {
 			$user->$nameAtt = $this->username;
-			$attributes[] = $nameAtt;
-			$validators = $user->getValidators($nameAtt);
+			$attributes[]   = $nameAtt;
+			$validators     = $user->getValidators($nameAtt);
 		}
-		if($emailAtt)
-		{
+		if($emailAtt) {
 			$user->$emailAtt = $this->email;
-			$attributes[] = $emailAtt;
-			foreach ($user->getValidators($emailAtt) as $validator)
-				// it can be, that one validator is used for both atts
-				if (!in_array($validator, $validators, true))
-					$validators[] = $validator;
-			}
-
-			$ignored = array();
-			foreach($validators as $validator)
+			$attributes[]    = $emailAtt;
+			foreach($user->getValidators($emailAtt) as $validator) // it can be, that one validator is used for both atts
 			{
-				foreach($attributes as $attribute)
-				{
-				// we need to determine if we have a new errors
-					$errorsBefore = count($user->getErrors($attribute));
-					$validator->validate($user, array($attribute));
-					$errorsAfter =	count($user->getErrors($attribute));
-					if(get_class($validator) == 'CUniqueValidator' && $errorsBefore < $errorsAfter)
-					{
-					// we ignore uniqness checks (this checks if user with specified email or username registered), 
-					// because we will ask user for password, to check if this account belongs to him
-						$errors = $user->getErrors($attribute);
-						$ignored[] = end($errors);
-					}
+				if(!in_array($validator, $validators, true)) {
+					$validators[] = $validator;
 				}
 			}
+		}
 
-			$errors = array(
-				'email' => $user->getErrors($emailAtt),
-				'username' => $user->getErrors($nameAtt),
-				);
+		$ignored = array();
+		foreach($validators as $validator) {
+			foreach($attributes as $attribute) {
+				// we need to determine if we have a new errors
+				$errorsBefore = count($user->getErrors($attribute));
+				$validator->validate($user, array($attribute));
+				$errorsAfter = count($user->getErrors($attribute));
+				if(get_class($validator) == 'CUniqueValidator' && $errorsBefore < $errorsAfter) {
+					// we ignore uniqness checks (this checks if user with specified email or username registered), 
+					// because we will ask user for password, to check if this account belongs to him
+					$errors    = $user->getErrors($attribute);
+					$ignored[] = end($errors);
+				}
+			}
+		}
 
-			if(count($ignored))
-			{
+		$errors = array(
+			'email'    => $user->getErrors($emailAtt),
+			'username' => $user->getErrors($nameAtt),
+		);
+
+		if(count($ignored)) {
 			//removing ignored errors
-				foreach($ignored as $message)
-				{
-					foreach(array('email', 'username') as $attribute)
-					{
-						$index = array_search($message, $errors[$attribute]);
-						if($index !== false)
+			foreach($ignored as $message) {
+				foreach(
+					array(
+						'email',
+						'username'
+					) as $attribute
+				) {
+					$index = array_search($message, $errors[$attribute]);
+					if($index !== false) {
+						if(strpos($this->scenario, '_pass') === false || empty($this->password)) {
+							$errors[$attribute][$index] = $this->confirmStr($attribute);
+						} else // when we have scenario with '_pass' and we are here, than user entered valid password, so we simply unsetting errors from uniqness check
 						{
-							if(strpos($this->scenario, '_pass') === false || empty($this->password))
-								$errors[$attribute][$index] = $this->confirmStr($attribute);
-							else
-								// when we have scenario with '_pass' and we are here, than user entered valid password, so we simply unsetting errors from uniqness check
-								unset($errors[$attribute][$index]);
+							unset($errors[$attribute][$index]);
 						}
 					}
 				}
-				if(strpos($this->scenario, '_pass') === false)
-					$this->scenario .= '_pass';
 			}
-
-			$this->addErrors($errors);
-
-			return !$this->hasErrors();
+			if(strpos($this->scenario, '_pass') === false) {
+				$this->scenario .= '_pass';
+			}
 		}
+
+		$this->addErrors($errors);
+
+		return !$this->hasErrors();
+	}
 
 	/**
 	 * @return error string for account confirmation
 	 */
-	public function confirmStr($attributeName)
-	{
-		return HOAuthAction::t("This {attribute} is taken by another user. If this is your account, enter password in field below or change {attribute} and leave password blank.", array('{attribute}'=>$this->getAttributeLabel($attributeName)));
+	public function confirmStr($attributeName) {
+		return HOAuthAction::t("This {attribute} is taken by another user. If this is your account, enter password in field below or change {attribute} and leave password blank.", array('{attribute}' => $this->getAttributeLabel($attributeName)));
 	}
 
 	/**
 	 * Transfers collected values to the {@link HUserInfoForm::model}
-	 * 
+	 *
 	 * @access public
 	 * @return void
 	 */
-	public function getValidUserModel()
-	{
-		if($this->hasErrors())
+	public function getValidUserModel() {
+		if($this->hasErrors()) {
 			return null;
+		}
 
 		// syncing only when we have a new model
-		if($this->_model->isNewRecord && strpos($this->scenario, '_pass') === false)
-		{
+		if($this->_model->isNewRecord && strpos($this->scenario, '_pass') === false) {
 			$this->_model->setAttributes(array(
 				$this->emailAtt => $this->email,
-				$this->nameAtt => $this->username,
-				), false);
+				$this->nameAtt  => $this->username,
+			), false);
 
-			if(HOAuthAction::$useYiiUser)
-			{
+			if(HOAuthAction::$useYiiUser) {
 				$this->_model->superuser = 0;
-				$this->_model->status= (Yii::app()->getModule('user')->activeAfterRegister) ? User::STATUS_ACTIVE : User::STATUS_NOACTIVE;
-				$this->_model->activkey=UserModule::encrypting(microtime().$this->_model->email);
+				$this->_model->status    = (Yii::app()->getModule('user')->activeAfterRegister) ? User::STATUS_ACTIVE : User::STATUS_NOACTIVE;
+				$this->_model->activkey  = UserModule::encrypting(microtime() . $this->_model->email);
 			}
 		}
 
@@ -291,71 +313,66 @@ class HUserInfoForm extends CFormModel {
 	 * @access public
 	 * @return CForm instance
 	 */
-	public function getForm()
-	{
-		if(!$this->_form)
-		{
+	public function getForm() {
+		if(!$this->_form) {
 			$this->_form = new CForm(array(
-				'id' => strtolower(__CLASS__),
-				'elements' => array(
+				'id'         => strtolower(__CLASS__),
+				'elements'   => array(
 					'<div class="form">',
 					$this->header,
 					'username' => array(
 						'type' => 'text',
-						),
-					'email' => array(
+					),
+					'email'    => array(
 						'type' => 'text',
-						),
+					),
 					'password' => array(
 						'type' => 'password',
-						),
 					),
-				'buttons'=>array(
-					'submit'=>array(
-						'type'=>'submit',
-						'label'=>HOAuthAction::t('Submit'),
-						),
+				),
+				'buttons'    => array(
+					'submit' => array(
+						'type'  => 'submit',
+						'label' => HOAuthAction::t('Submit'),
+					),
 					'</div>',
-					),
-				'activeForm'=>array(
-					'id'=> strtolower(__CLASS__) . '-form',
-					'enableAjaxValidation'=>false,
-					'enableClientValidation'=>true,
-					'clientOptions' => array(
+				),
+				'activeForm' => array(
+					'id'                     => strtolower(__CLASS__) . '-form',
+					'enableAjaxValidation'   => false,
+					'enableClientValidation' => true,
+					'clientOptions'          => array(
 						'validateOnSubmit' => true,
 						'validateOnChange' => true,
-						),
 					),
-				), $this);
+				),
+			), $this);
 		}
 		return $this->_form;
 	}
 
-	public function getModel()
-	{
+	public function getModel() {
 		return $this->_model;
 	}
 
 	/**
-	 * Different form headers for different scenarios	
-	 * 
+	 * Different form headers for different scenarios
+	 *
 	 * @access public
 	 * @return void
 	 */
-	public function getHeader()
-	{
+	public function getHeader() {
 		$header = '';
-		switch($this->scenario)
-		{
+		switch($this->scenario) {
 			case 'both':
-			$header = HOAuthAction::t('Please specify your '.$this->getAttributeLabel('username').' and '.$this->getAttributeLabel('email').' to end with registration.');
-			break;
+				$header = 'Alobuta không thể xác định được tài khoản và hòm thư của bạn. Vui lòng nhập tài khoản và hòm thư để hoàn tất việc đăng ký!';
+				break;
 			case 'username':
-			$header = HOAuthAction::t('Please specify your '.$this->getAttributeLabel('username').' to end with registration.');
-			break;
+				$header = 'Alobuta không thể xác định được tài khoản của bạn. Vui lòng nhập tài khoản để hoàn tất việc đăng ký!';
+				break;
 			case 'email':
-			$header = HOAuthAction::t('Please specify your '.$this->getAttributeLabel('email').' to end with registration.');
-			break;
+				$header = 'Alobuta không thể xác định được hòm thư của bạn. Vui lòng nhập địa chỉ hòm thư để hoàn tất việc đăng ký!';
+				break;
 		}
 
 		return "<p class=\"hFormHeader\">$header</p>";

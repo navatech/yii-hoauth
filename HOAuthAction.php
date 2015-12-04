@@ -76,14 +76,14 @@ class HOAuthAction extends CAction
 	/**
 	 * @var boolean $useYiiUser enables support of Yii user module
 	 */
-	public static $useYiiUser;
+	public static $useYiiUser = false;
 
 	/**
 	 * @var boolean $alwaysCheckPass flag to control password checking for the scenario, 
 	 *      when when social network returned email of existing local account. If set to
 	 *      `false` user will be automatically logged in without confirming account with password
 	 */
-	public $alwaysCheckPass = true;
+	public $alwaysCheckPass = false;
 
 	/**
 	 * @var string $userIdentityClass UserIdentity class that will be used to log user in.
@@ -264,10 +264,10 @@ class HOAuthAction extends CAction
 	{
 		$isNewUser = false;
 		$userProfile = $this->oAuth->profile;
-
+		$provider = $_REQUEST['provider'];
 		if($this->oAuth->isBond) {
 			// this social network account is bond to existing local account
-			Yii::log("Logged in with existing link with '{$this->oAuth->provider}' provider", CLogger::LEVEL_INFO, 'hoauth.'.__CLASS__);
+			Yii::log("Logged in with existing link with '$provider' provider", CLogger::LEVEL_INFO, 'hoauth.'.__CLASS__);
 			$user = $this->userModel->findByPk($this->oAuth->user_id);
 
 			return array($user, $isNewUser);
@@ -376,7 +376,7 @@ class HOAuthAction extends CAction
 
 		if(!$form->validateUser()) {
 			// We need to request some info from user
-			$this->controller->render('hoauth.views.form', array(
+			$this->controller->renderPartial('hoauth.views.form', array(
 				'form' => $form,
 				));
 			Yii::app()->end();
@@ -489,7 +489,7 @@ class HOAuthAction extends CAction
 		}
 
 		if(!isset(self::$useYiiUser)) {
-			self::$useYiiUser = file_exists(Yii::getPathOfAlias('user.components') . '/UWrelBelongsTo.php');
+			self::$useYiiUser = file_exists(Yii::getPathOfAlias('application.modules.user.components') . '/UWrelBelongsTo.php');
 		}
 
 		// checking if we have `yii-user` module (I think that `UWrelBelongsTo` is unique class name from `yii-user`)
